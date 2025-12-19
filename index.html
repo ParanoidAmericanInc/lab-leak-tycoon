@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lab Leak Tycoon</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Source+Code+Pro&family=Creepster&display=swap');
+        *{margin:0;padding:0;box-sizing:border-box}
+        :root{--toxic:#39ff14;--yellow:#ffd700;--red:#8b0000;--blue:#1e90ff;--green:#00ff00;--purple:#9932cc;--bg:#0a0a0a;--panel:#1a1a2e;--border:#16213e;--text:#e0e0e0;--muted:#888}
+        body{font-family:'Source Code Pro',monospace;background:var(--bg);color:var(--text);min-height:100vh}
+        body::before{content:'';position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.1) 0 1px,transparent 1px 2px);z-index:9999}
+        #game{max-width:1400px;margin:0 auto;padding:20px;display:none}
+        .header{text-align:center;padding:20px;border-bottom:2px solid var(--toxic);margin-bottom:20px}
+        .header h1{font-family:'Creepster',cursive;font-size:3em;color:var(--toxic);text-shadow:0 0 20px var(--toxic);animation:glow 2s ease-in-out infinite alternate}
+        @keyframes glow{to{text-shadow:0 0 30px var(--toxic),0 0 60px var(--toxic)}}
+        .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:15px;margin-bottom:20px}
+        .stat{background:linear-gradient(135deg,var(--panel),#0f0f23);border:1px solid var(--border);border-radius:8px;padding:15px;text-align:center;position:relative}
+        .stat::before{content:'';position:absolute;top:0;left:0;width:100%;height:3px;background:var(--toxic)}
+        .stat.money::before{background:var(--green)}.stat.suspicion::before{background:#ff4444}.stat.infection::before{background:var(--yellow)}
+        .stat-label{font-size:.75em;color:var(--muted);text-transform:uppercase}
+        .stat-value{font-family:'Orbitron',sans-serif;font-size:1.4em;font-weight:700;margin-top:5px}
+        .stat.money .stat-value{color:var(--green)}.stat.suspicion .stat-value{color:#ff4444}.stat.infection .stat-value{color:var(--yellow)}.stat.day .stat-value{color:var(--blue)}
+        .progress{width:100%;height:6px;background:#333;border-radius:3px;margin-top:8px;overflow:hidden}
+        .progress-fill{height:100%;transition:width .3s}
+        .main{display:grid;grid-template-columns:280px 1fr 280px;gap:20px}
+        .panel{background:linear-gradient(180deg,var(--panel),#12122a);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+        .panel-header{background:linear-gradient(90deg,var(--border),transparent);padding:12px 15px;font-family:'Orbitron',sans-serif;font-size:.85em;text-transform:uppercase;border-bottom:1px solid var(--border)}
+        .panel-content{padding:15px;max-height:480px;overflow-y:auto}
+        .tabs{display:flex;gap:5px;margin-bottom:15px}
+        .tab{flex:1;padding:8px;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:6px 6px 0 0;cursor:pointer;font-size:.75em;text-transform:uppercase}
+        .tab:hover{background:rgba(57,255,20,.1)}.tab.active{background:var(--panel);border-bottom-color:transparent;color:var(--toxic)}
+        .tab-content{display:none}.tab-content.active{display:block}
+        .inv-item{display:flex;align-items:center;gap:10px;padding:10px;margin-bottom:8px;background:rgba(0,0,0,.3);border-radius:6px;border:1px solid transparent;cursor:pointer;transition:.2s}
+        .inv-item:hover{border-color:var(--toxic);background:rgba(57,255,20,.1)}
+        .inv-item svg{width:40px;height:40px;flex-shrink:0}
+        .item-name{font-weight:600;font-size:.9em}.item-qty{font-size:.75em;color:var(--muted)}
+        .map{position:relative;background:#0d0d1a;border-radius:8px;height:380px;overflow:hidden}
+        .marker{position:absolute;cursor:pointer;transition:transform .2s}.marker:hover{transform:scale(1.2)}
+        .marker.current{filter:drop-shadow(0 0 10px var(--toxic))}.marker.infected{filter:drop-shadow(0 0 10px var(--red))}
+        .tooltip{position:absolute;background:var(--panel);border:1px solid var(--toxic);border-radius:8px;padding:12px;font-size:.85em;pointer-events:none;z-index:100;display:none;min-width:180px}
+        .tooltip.visible{display:block}.tooltip h4{color:var(--toxic);margin-bottom:8px}
+        .craft-area{margin-top:15px}
+        .craft-slots{display:flex;gap:8px;justify-content:center;align-items:center;margin-bottom:15px}
+        .craft-slot{width:60px;height:60px;border:2px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.3);cursor:pointer}
+        .craft-slot:hover{border-color:var(--toxic)}.craft-slot.filled{border-style:solid;border-color:var(--yellow)}
+        .craft-slot svg{width:45px;height:45px}
+        .craft-plus{font-size:20px;color:var(--muted)}.craft-eq{font-size:20px;color:var(--toxic)}
+        .craft-result{width:70px;height:70px;border:2px solid var(--toxic);border-radius:8px;display:flex;align-items:center;justify-content:center;background:rgba(57,255,20,.1)}
+        .btn{font-family:'Orbitron',sans-serif;padding:10px 20px;border:none;border-radius:6px;cursor:pointer;font-size:.8em;text-transform:uppercase;transition:.2s;display:inline-flex;align-items:center;gap:8px}
+        .btn-primary{background:linear-gradient(135deg,var(--toxic),#2db82d);color:#000}
+        .btn-primary:hover{box-shadow:0 0 20px var(--toxic)}
+        .btn-danger{background:linear-gradient(135deg,var(--red),#cc0000);color:#fff}
+        .btn-info{background:linear-gradient(135deg,var(--blue),#0066cc);color:#fff}
+        .btn-money{background:linear-gradient(135deg,#ffd700,#ffaa00);color:#000}
+        .btn:disabled{opacity:.5;cursor:not-allowed}.btn-sm{padding:6px 12px;font-size:.7em}
+        .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:15px}
+        .job,.pr-item{display:flex;justify-content:space-between;align-items:center;padding:12px;margin-bottom:10px;background:rgba(0,0,0,.3);border-radius:6px;border-left:3px solid var(--green)}
+        .job.cooldown{opacity:.5;border-left-color:var(--muted)}
+        .pr-item{border-left-color:var(--blue)}
+        .job-info h4,.pr-info h4{font-size:.85em;margin-bottom:4px}
+        .job-info p,.pr-info p{font-size:.7em;color:var(--muted)}
+        .disease{background:linear-gradient(135deg,rgba(139,0,0,.3),rgba(0,0,0,.5));border:1px solid var(--red);border-radius:10px;padding:15px;margin-bottom:15px}
+        .disease.vaccine{background:linear-gradient(135deg,rgba(153,50,204,.3),rgba(0,0,0,.5));border-color:var(--purple)}
+        .disease.hybrid{background:linear-gradient(135deg,rgba(255,215,0,.3),rgba(0,0,0,.5));border-color:var(--yellow)}
+        .disease.dead{opacity:.4;border-color:#444}
+        .disease-name{font-family:'Creepster',cursive;font-size:1.1em;color:var(--yellow);margin-bottom:8px}
+        .disease-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font-size:.7em}
+        .disease-stat{text-align:center}.disease-stat-label{color:var(--muted)}.disease-stat-value{color:var(--toxic);font-weight:600}
+        .health-bar{display:flex;align-items:center;gap:8px;margin-top:8px}
+        .health-track{flex:1;height:6px;background:#333;border-radius:3px;overflow:hidden}
+        .health-fill{height:100%;transition:width .3s}
+        .health-fill.good{background:var(--toxic)}.health-fill.weak{background:var(--yellow)}.health-fill.dying{background:var(--red)}
+        .log-entry{padding:8px 12px;margin-bottom:6px;border-radius:4px;font-size:.75em;border-left:3px solid var(--muted);background:rgba(0,0,0,.2)}
+        .log-entry.success{border-color:var(--green)}.log-entry.warning{border-color:var(--yellow)}.log-entry.danger{border-color:var(--red)}.log-entry.info{border-color:var(--blue)}
+        .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;z-index:1000}
+        .modal-bg.active{display:flex}
+        .modal{background:linear-gradient(180deg,var(--panel),#0a0a1a);border:2px solid var(--toxic);border-radius:15px;padding:30px;max-width:650px;width:90%;text-align:center;max-height:90vh;overflow-y:auto}
+        .modal h2{font-family:'Creepster',cursive;font-size:1.8em;margin-bottom:20px;color:var(--toxic)}
+        .shop-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;max-height:350px;overflow-y:auto}
+        .shop-item{background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;cursor:pointer}
+        .shop-item:hover{border-color:var(--green);background:rgba(0,255,0,.1)}
+        .shop-item svg{width:40px;height:40px;margin:0 auto 8px}
+        .shop-item .price{font-family:'Orbitron',sans-serif;color:var(--green);font-size:.85em}
+        #start{position:fixed;inset:0;background:radial-gradient(ellipse at center,#1a1a2e,#0a0a0a);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:2000}
+        #start h1{font-family:'Creepster',cursive;font-size:4em;color:var(--toxic);text-shadow:0 0 30px var(--toxic);margin-bottom:20px}
+        #start .tagline{color:var(--muted);margin-bottom:40px;font-style:italic}
+        .bio-icon{width:120px;height:120px;margin-bottom:30px;animation:spin 20s linear infinite}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        #start .disclaimer{position:absolute;bottom:30px;font-size:.65em;color:var(--muted);max-width:550px;text-align:center;opacity:.7}
+        .tut-bg{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:3000;display:none;align-items:center;justify-content:center}
+        .tut-bg.active{display:flex}
+        .tut-box{background:linear-gradient(180deg,var(--panel),#0a0a1a);border:3px solid var(--toxic);border-radius:15px;padding:40px;max-width:550px;text-align:center}
+        .tut-box h3{font-family:'Creepster',cursive;font-size:1.6em;color:var(--toxic);margin-bottom:20px}
+        .tut-box p{margin-bottom:15px;line-height:1.6}
+        .tut-box .hl{color:var(--yellow);font-weight:bold}
+        .tut-dots{display:flex;justify-content:center;gap:8px;margin:20px 0}
+        .tut-dot{width:10px;height:10px;border-radius:50%;background:var(--border)}
+        .tut-dot.active{background:var(--toxic)}.tut-dot.done{background:var(--green)}
+        .ticker{background:rgba(0,0,0,.5);border-top:1px solid var(--red);border-bottom:1px solid var(--red);padding:10px 0;margin:20px 0;overflow:hidden}
+        .ticker-content{display:flex;animation:ticker 30s linear infinite;white-space:nowrap}
+        @keyframes ticker{from{transform:translateX(100%)}to{transform:translateX(-100%)}}
+        .ticker-item{padding:0 50px;color:var(--yellow);font-size:.85em}
+        .ticker-item::before{content:'⚠ BREAKING: ';color:var(--red)}
+    </style>
+</head>
+<body>
+<div id="start">
+    <svg class="bio-icon" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="none" stroke="#39ff14" stroke-width="2"/><circle cx="50" cy="50" r="8" fill="#39ff14"/><g fill="#39ff14"><path d="M50 18 Q65 35 50 50 Q35 35 50 18 Z"/><path d="M50 18 Q65 35 50 50 Q35 35 50 18 Z" transform="rotate(120 50 50)"/><path d="M50 18 Q65 35 50 50 Q35 35 50 18 Z" transform="rotate(240 50 50)"/></g><circle cx="50" cy="25" r="12" fill="none" stroke="#39ff14" stroke-width="3"/><circle cx="28" cy="65" r="12" fill="none" stroke="#39ff14" stroke-width="3"/><circle cx="72" cy="65" r="12" fill="none" stroke="#39ff14" stroke-width="3"/></svg>
+    <h1>Lab Leak Tycoon</h1>
+    <p class="tagline">"Never let a good crisis go to waste" - A Satirical Simulation</p>
+    <button class="btn btn-primary" onclick="startGame()" style="font-size:1.1em;padding:15px 35px">▶ START GAME</button>
+    <p class="disclaimer">This is a work of satire and dark humor. Any resemblance to actual events is purely for comedic purposes. Please don't actually do any of this.</p>
+</div>
+<div class="tut-bg" id="tut-bg">
+    <div class="tut-box"><h3 id="tut-title"></h3><p id="tut-text"></p><div class="tut-dots" id="tut-dots"></div><button class="btn btn-primary" onclick="nextTut()">Next</button> <button class="btn btn-sm" style="background:transparent;color:var(--muted)" onclick="skipTut()">Skip</button></div>
+</div>
+<div id="game">
+    <header class="header"><h1>Lab Leak Tycoon</h1></header>
+    <div class="stats">
+        <div class="stat money"><div class="stat-label">Net Worth</div><div class="stat-value" id="money">$5M</div></div>
+        <div class="stat suspicion"><div class="stat-label">Suspicion</div><div class="stat-value" id="suspicion">0%</div><div class="progress"><div class="progress-fill" id="susp-bar" style="width:0%;background:linear-gradient(90deg,#4f4,#ff0,#f44)"></div></div></div>
+        <div class="stat infection"><div class="stat-label">Infection</div><div class="stat-value" id="infection">0%</div><div class="progress"><div class="progress-fill" id="inf-bar" style="width:0%;background:linear-gradient(90deg,#ffd700,#8b0000)"></div></div></div>
+        <div class="stat day"><div class="stat-label">Day</div><div class="stat-value" id="day">1</div></div>
+        <div class="stat"><div class="stat-label">Goal</div><div class="stat-value" style="color:var(--yellow)">$200B</div></div>
+    </div>
+    <div class="ticker"><div class="ticker-content" id="ticker"><span class="ticker-item">Markets steady as pharmaceutical stocks show unusual activity</span><span class="ticker-item">WHO announces health preparedness summit</span></div></div>
+    <div class="main">
+        <div class="panel">
+            <div class="panel-header">🧪 Lab Inventory</div>
+            <div class="panel-content">
+                <div class="tabs"><div class="tab active" onclick="switchTab('inv',this)">Items</div><div class="tab" onclick="switchTab('cre',this)">Creations</div></div>
+                <div id="inv-tab" class="tab-content active"><div id="inv-list"></div></div>
+                <div id="cre-tab" class="tab-content"><div id="cre-list"></div></div>
+                <div class="craft-area">
+                    <div class="panel-header" style="margin:15px -15px;padding:8px 15px">🧬 Crafting Lab</div>
+                    <div class="craft-slots">
+                        <div class="craft-slot" id="slot0" onclick="clearSlot(0)"></div><span class="craft-plus">+</span>
+                        <div class="craft-slot" id="slot1" onclick="clearSlot(1)"></div><span class="craft-plus">+</span>
+                        <div class="craft-slot" id="slot2" onclick="clearSlot(2)"></div><span class="craft-eq">=</span>
+                        <div class="craft-result" id="result">?</div>
+                    </div>
+                    <button class="btn btn-danger" onclick="craft()" style="width:100%">🧬 Synthesize</button>
+                </div>
+            </div>
+        </div>
+        <div class="panel">
+            <div class="panel-header">🌍 Global Operations - <span id="loc-name">Wuhan Lab</span></div>
+            <div class="panel-content">
+                <div class="map" id="map"></div>
+                <div class="actions">
+                    <button class="btn btn-primary" onclick="openShop()">🛒 Black Market</button>
+                    <button class="btn btn-danger" onclick="release()" id="rel-btn" disabled>☣️ Release</button>
+                    <button class="btn btn-money" onclick="sellVax()" id="vax-btn" disabled>💉 Sell Vaccines</button>
+                    <button class="btn btn-info" onclick="nextDay()">⏭️ Next Day</button>
+                </div>
+            </div>
+        </div>
+        <div class="panel">
+            <div class="panel-header">📊 Operations</div>
+            <div class="panel-content">
+                <div class="tabs"><div class="tab active" onclick="switchTab('jobs',this)">💰 Jobs</div><div class="tab" onclick="switchTab('pr',this)">📺 PR</div><div class="tab" onclick="switchTab('log',this)">📋 Log</div></div>
+                <div id="jobs-tab" class="tab-content active"><div id="jobs-list"></div></div>
+                <div id="pr-tab" class="tab-content"><div id="pr-list"></div></div>
+                <div id="log-tab" class="tab-content"><div id="log-list"></div></div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal-bg" id="shop-modal">
+    <div class="modal"><h2>🏴‍☠️ Black Market</h2><p style="color:var(--muted);margin-bottom:10px">Location: <span id="shop-loc" style="color:var(--yellow)"></span></p><p id="shop-spec" style="color:var(--toxic);font-size:.85em;margin-bottom:15px"></p><div class="shop-grid" id="shop-grid"></div><div style="margin-top:20px"><button class="btn btn-info" onclick="closeShop()">Close</button></div></div>
+</div>
+<div class="modal-bg" id="end-modal">
+    <div class="modal" id="end-content"><h2 id="end-title"></h2><p id="end-msg" style="margin:20px 0"></p><div id="end-stats"></div><button class="btn btn-primary" onclick="location.reload()">Play Again</button></div>
+</div>
+<svg style="display:none">
+<symbol id="i-bat" viewBox="0 0 50 50"><path fill="#8b4513" d="M25 15 Q15 5 5 15 Q10 20 15 18 L20 25 Q15 30 10 35 L15 32 Q20 35 25 35 Q30 35 35 32 L40 35 Q35 30 30 25 L35 18 Q40 20 45 15 Q35 5 25 15 Z"/><circle cx="22" cy="20" r="2" fill="#f00"/><circle cx="28" cy="20" r="2" fill="#f00"/></symbol>
+<symbol id="i-pangolin" viewBox="0 0 50 50"><ellipse cx="25" cy="30" rx="18" ry="12" fill="#8b7355"/><path fill="#a08060" d="M20 22 L22 18 L24 22 M26 22 L28 18 L30 22"/><circle cx="12" cy="28" r="5" fill="#8b7355"/><circle cx="10" cy="27" r="1" fill="#000"/></symbol>
+<symbol id="i-rat" viewBox="0 0 50 50"><ellipse cx="25" cy="30" rx="12" ry="8" fill="#ccc"/><circle cx="15" cy="28" r="6" fill="#ccc"/><circle cx="13" cy="27" r="1" fill="#000"/><path fill="#fcc" d="M38 30 Q50 30 48 32 Q50 34 38 34 Z"/></symbol>
+<symbol id="i-monkey" viewBox="0 0 50 50"><circle cx="25" cy="28" r="12" fill="#8b4513"/><circle cx="25" cy="30" r="8" fill="#deb887"/><circle cx="22" cy="27" r="2" fill="#000"/><circle cx="28" cy="27" r="2" fill="#000"/><circle cx="12" cy="25" r="5" fill="#8b4513"/><circle cx="38" cy="25" r="5" fill="#8b4513"/></symbol>
+<symbol id="i-mosquito" viewBox="0 0 50 50"><ellipse cx="25" cy="28" rx="8" ry="12" fill="#2d2d2d"/><circle cx="25" cy="15" r="5" fill="#2d2d2d"/><path fill="none" stroke="#666" d="M15 20 Q5 15 8 25 M35 20 Q45 15 42 25"/></symbol>
+<symbol id="i-frog" viewBox="0 0 50 50"><ellipse cx="25" cy="32" rx="15" ry="10" fill="#228b22"/><circle cx="18" cy="22" r="6" fill="#228b22"/><circle cx="32" cy="22" r="6" fill="#228b22"/><circle cx="18" cy="20" r="2" fill="#000"/><circle cx="32" cy="20" r="2" fill="#000"/></symbol>
+<symbol id="i-camel" viewBox="0 0 50 50"><ellipse cx="25" cy="32" rx="18" ry="10" fill="#c19a6b"/><path fill="#c19a6b" d="M20 25 Q18 15 22 20 Q25 12 28 20 Q32 15 30 25"/><circle cx="10" cy="28" r="5" fill="#c19a6b"/><circle cx="9" cy="26" r="1" fill="#000"/></symbol>
+<symbol id="i-mink" viewBox="0 0 50 50"><ellipse cx="28" cy="30" rx="16" ry="8" fill="#8b4513"/><circle cx="12" cy="28" r="6" fill="#8b4513"/><circle cx="10" cy="27" r="1" fill="#000"/></symbol>
+<symbol id="i-snake" viewBox="0 0 50 50"><path fill="#228b22" d="M10 35 Q15 25 25 30 Q35 35 40 25 Q45 15 40 12"/><circle cx="42" cy="12" r="4" fill="#228b22"/><circle cx="40" cy="11" r="1" fill="#f00"/><circle cx="44" cy="11" r="1" fill="#f00"/></symbol>
+<symbol id="i-civet" viewBox="0 0 50 50"><ellipse cx="25" cy="32" rx="15" ry="10" fill="#4a4a4a"/><circle cx="12" cy="28" r="6" fill="#4a4a4a"/><circle cx="10" cy="27" r="1.5" fill="#fc0"/></symbol>
+<symbol id="i-chemical" viewBox="0 0 50 50"><path fill="#39ff14" opacity=".7" d="M20 15 L20 30 L15 45 L35 45 L30 30 L30 15 Z"/><path fill="none" stroke="#fff" stroke-width="2" d="M20 15 L20 30 L15 45 L35 45 L30 30 L30 15"/><rect x="18" y="10" width="14" height="6" fill="#444"/></symbol>
+<symbol id="i-spike" viewBox="0 0 50 50"><circle cx="25" cy="25" r="10" fill="#f44" opacity=".8"/><g fill="#f66"><path d="M25 5 L27 15 L23 15 Z"/><path d="M25 45 L27 35 L23 35 Z"/><path d="M5 25 L15 27 L15 23 Z"/><path d="M45 25 L35 27 L35 23 Z"/></g></symbol>
+<symbol id="i-mrna" viewBox="0 0 50 50"><path fill="none" stroke="#1e90ff" stroke-width="3" d="M10 25 Q15 15 20 25 T30 25 T40 25"/><path fill="none" stroke="#0bf" stroke-width="3" d="M10 30 Q15 40 20 30 T30 30 T40 30"/></symbol>
+<symbol id="i-prion" viewBox="0 0 50 50"><path fill="#93c" d="M15 25 Q20 15 25 25 Q30 35 35 25 Q40 15 45 25"/><circle cx="20" cy="22" r="4" fill="#93c"/><circle cx="35" cy="28" r="3" fill="#b5d"/></symbol>
+<symbol id="i-toxin" viewBox="0 0 50 50"><circle cx="25" cy="25" r="15" fill="#8b0000" opacity=".6"/><circle cx="25" cy="25" r="5" fill="#f00"/><text x="25" y="28" text-anchor="middle" fill="#fff" font-size="8">☠</text></symbol>
+<symbol id="i-enzyme" viewBox="0 0 50 50"><circle cx="25" cy="25" r="12" fill="#fa0" opacity=".7"/><path fill="#f80" d="M25 13 Q35 18 30 25 Q35 32 25 37 Q15 32 20 25 Q15 18 25 13"/></symbol>
+<symbol id="i-lipid" viewBox="0 0 50 50"><ellipse cx="25" cy="25" rx="18" ry="12" fill="none" stroke="#fc0" stroke-width="3"/><ellipse cx="25" cy="25" rx="12" ry="8" fill="#fc0" opacity=".5"/></symbol>
+<symbol id="i-adjuvant" viewBox="0 0 50 50"><polygon points="25,5 45,40 5,40" fill="#0cd" opacity=".7"/><polygon points="25,15 38,38 12,38" fill="#0cd"/></symbol>
+<symbol id="i-gof" viewBox="0 0 50 50"><circle cx="25" cy="25" r="15" fill="none" stroke="#fd0" stroke-width="2"/><circle cx="25" cy="25" r="8" fill="#fd0" opacity=".5"/><text x="25" y="28" text-anchor="middle" fill="#000" font-size="8" font-weight="bold">GoF</text></symbol>
+<symbol id="i-bioreactor" viewBox="0 0 50 50"><rect x="15" y="10" width="20" height="35" rx="3" fill="#444" stroke="#666" stroke-width="2"/><rect x="18" y="15" width="14" height="20" fill="#39ff14" opacity=".5"/><circle cx="25" cy="25" r="4" fill="#39ff14"/></symbol>
+<symbol id="i-centrifuge" viewBox="0 0 50 50"><circle cx="25" cy="25" r="18" fill="#555" stroke="#777" stroke-width="2"/><circle cx="25" cy="25" r="12" fill="#333"/><circle cx="25" cy="15" r="4" fill="#1e90ff"/><circle cx="25" cy="35" r="4" fill="#1e90ff"/></symbol>
+<symbol id="i-sequencer" viewBox="0 0 50 50"><rect x="10" y="12" width="30" height="26" rx="2" fill="#2a2a4a" stroke="#4a4a6a" stroke-width="2"/><rect x="14" y="16" width="22" height="14" fill="#010"/><path fill="none" stroke="#0f0" d="M16 23 L20 20 L24 26 L28 18 L32 24"/></symbol>
+<symbol id="i-incubator" viewBox="0 0 50 50"><rect x="12" y="15" width="26" height="25" rx="2" fill="#3a3a3a" stroke="#5a5a5a" stroke-width="2"/><rect x="15" y="18" width="20" height="15" fill="#fc0" opacity=".3"/><circle cx="25" cy="25" r="5" fill="#f60" opacity=".5"/></symbol>
+<symbol id="i-crispr" viewBox="0 0 50 50"><path fill="none" stroke="#f0f" stroke-width="2" d="M10 20 Q25 10 40 20 M10 30 Q25 40 40 30"/><line x1="25" y1="18" x2="25" y2="32" stroke="#0ff" stroke-width="2"/><path fill="#ff0" d="M25 22 L30 25 L25 28 L20 25 Z"/></symbol>
+<symbol id="i-virus" viewBox="0 0 50 50"><circle cx="25" cy="25" r="12" fill="#8b0000"/><g fill="#f44"><circle cx="25" cy="8" r="4"/><circle cx="25" cy="42" r="4"/><circle cx="8" cy="25" r="4"/><circle cx="42" cy="25" r="4"/><circle cx="13" cy="13" r="3"/><circle cx="37" cy="37" r="3"/></g></symbol>
+<symbol id="i-vaccine" viewBox="0 0 50 50"><rect x="22" y="8" width="6" height="30" rx="2" fill="#93c"/><circle cx="25" cy="42" r="4" fill="#666"/><path fill="#b5d" opacity=".7" d="M22 15 L28 15 L28 25 L22 25 Z"/></symbol>
+<symbol id="i-hybrid" viewBox="0 0 50 50"><circle cx="25" cy="25" r="12" fill="#fd0" opacity=".5"/><path fill="#f44" d="M25 8 L27 18 L23 18 Z"/><path fill="#93c" d="M25 42 L27 32 L23 32 Z"/><circle cx="25" cy="25" r="5" fill="#fd0"/></symbol>
+<symbol id="i-marker" viewBox="0 0 30 40"><path fill="currentColor" d="M15 0 C7 0 0 7 0 15 C0 25 15 40 15 40 C15 40 30 25 30 15 C30 7 23 0 15 0 Z"/><circle cx="15" cy="15" r="6" fill="#0a0a0a"/></symbol>
+</svg>
+<script>
+const G={money:5000000,suspicion:0,infection:0,day:1,loc:'wuhan',pathogens:[],inv:{},creations:[],slots:[null,null,null],vaxSold:0,cooldowns:{},tutStep:0};
+const items={bat:{n:'Horseshoe Bat',i:'bat',t:'animal',p:500000},pangolin:{n:'Pangolin',i:'pangolin',t:'animal',p:2000000},civet:{n:'Palm Civet',i:'civet',t:'animal',p:1500000},snake:{n:'Cobra',i:'snake',t:'animal',p:800000},monkey:{n:'Green Monkey',i:'monkey',t:'animal',p:3000000},fruitbat:{n:'Fruit Bat',i:'bat',t:'animal',p:600000},mosquito:{n:'Aedes Mosquito',i:'mosquito',t:'animal',p:100000},frog:{n:'Poison Dart Frog',i:'frog',t:'animal',p:400000},junglerat:{n:'Jungle Rat',i:'rat',t:'animal',p:200000},camel:{n:'Dromedary Camel',i:'camel',t:'animal',p:2500000},mink:{n:'Farm Mink',i:'mink',t:'animal',p:1000000},labrat:{n:'Lab Rat',i:'rat',t:'animal',p:150000},chemical:{n:'Viral Agent',i:'chemical',t:'chemical',p:1000000},toxin:{n:'Biotoxin',i:'toxin',t:'chemical',p:1500000},spike:{n:'Spike Protein',i:'spike',t:'chemical',p:3000000},mrna:{n:'mRNA Template',i:'mrna',t:'chemical',p:8000000},prion:{n:'Prion Sample',i:'prion',t:'chemical',p:5000000},enzyme:{n:'ACE2 Enzyme',i:'enzyme',t:'chemical',p:4000000},lipid:{n:'Lipid Nanoparticle',i:'lipid',t:'chemical',p:6000000},adjuvant:{n:'Adjuvant',i:'adjuvant',t:'chemical',p:3500000},gof:{n:'Gain-of-Function Kit',i:'gof',t:'equip',p:15000000},bioreactor:{n:'Bioreactor',i:'bioreactor',t:'equip',p:10000000},centrifuge:{n:'Ultracentrifuge',i:'centrifuge',t:'equip',p:8000000},sequencer:{n:'Gene Sequencer',i:'sequencer',t:'equip',p:12000000},incubator:{n:'BSL-4 Incubator',i:'incubator',t:'equip',p:7000000},crispr:{n:'CRISPR Kit',i:'crispr',t:'equip',p:20000000}};
+const locs={wuhan:{n:'Wuhan Research Lab',x:580,y:140,items:['bat','pangolin','civet','snake','chemical','gof','bioreactor','incubator','centrifuge'],m:.7,d:'🦇 Asian wildlife + Research (30% off)',c:500000},swiss:{n:'Swiss Pharma HQ',x:390,y:100,items:['mrna','spike','enzyme','lipid','adjuvant','labrat','sequencer'],m:1.8,d:'💊 Premium pharma (80% markup)',c:1500000},cdc:{n:'CDC Atlanta',x:150,y:130,items:['labrat','chemical','spike','gof','sequencer','crispr','adjuvant'],m:1.3,d:'🇺🇸 Govt research + CRISPR',c:1000000},congo:{n:'Congo Basin',x:400,y:240,items:['monkey','fruitbat','mosquito','toxin'],m:.4,d:'🌍 African wildlife (60% off!)',c:800000},amazon:{n:'Amazon Rainforest',x:180,y:280,items:['frog','junglerat','toxin','chemical'],m:.5,d:'🐸 Rare toxins & specimens',c:700000},dubai:{n:'Dubai Bio-Hub',x:450,y:170,items:['camel','chemical','mrna','lipid','bioreactor'],m:1.5,d:'🐪 Camels + Pharma',c:1200000},moscow:{n:'Siberian Station',x:520,y:70,items:['prion','chemical','toxin','incubator','centrifuge'],m:.8,d:'🧊 Permafrost pathogens',c:900000},netherlands:{n:'Dutch Mink Farms',x:380,y:85,items:['mink','labrat','chemical','enzyme','adjuvant'],m:1.1,d:'🦡 European animals',c:1100000}};
+const jobs={consult:{n:'🏥 Pharma Consulting',d:'Advise on "regulatory strategy"',pay:[500000,2000000],cd:0,sus:1},grant:{n:'🎓 Research Grant',d:'Government funding',pay:[1000000,5000000],cd:3,sus:0},lecture:{n:'🎤 Speaking Fee',d:'Medical conference talk',pay:[200000,800000],cd:0,sus:0},patent:{n:'📜 Sell Patent',d:'License to pharma',pay:[2000000,10000000],cd:5,sus:2},insider:{n:'📈 Insider Trading',d:'Trade on special knowledge',pay:[5000000,20000000],cd:7,sus:5},samples:{n:'🧪 Sell Samples',d:'Black market biologicals',pay:[300000,1500000],cd:1,sus:3}};
+const tuts=[{t:"Welcome, Pharma Mogul! 💰",m:"Your goal: reach <span class='hl'>$200 BILLION</span> without getting caught!"},{t:"Step 1: Earn Capital 💵",m:"Use <span class='hl'>Side Jobs</span> on the right to earn money."},{t:"Step 2: Travel & Shop 🌍",m:"Click map locations. Each has <span class='hl'>UNIQUE items</span>!"},{t:"Step 3: Collect Items 🦇",m:"Open <span class='hl'>Black Market</span> to buy animals, chemicals, equipment."},{t:"Step 4: Craft 🧬",m:"Combine <span class='hl'>ANY 3 items</span> to create pathogens, vaccines, or hybrids!"},{t:"Step 5: Release & Profit ☣️",m:"Release pathogens, sell vaccines! Some <span class='hl'>spread fast</span>, others <span class='hl'>die quickly</span>."},{t:"Step 6: Manage PR 📺",m:"Use propaganda to reduce suspicion. 100% = GAME OVER!"},{t:"Ready! 🎮",m:"High spread = more infections = more sales. Good luck!"}];
+
+function fmt(n){return n>=1e12?(n/1e12).toFixed(1)+'T':n>=1e9?(n/1e9).toFixed(1)+'B':n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'K':n}
+function svg(id){return `<svg viewBox="0 0 50 50"><use href="#i-${id}"/></svg>`}
+function log(m,t='info'){const l=document.getElementById('log-list');l.innerHTML=`<div class="log-entry ${t}">[Day ${G.day}] ${m}</div>`+l.innerHTML}
+
+function startGame(){document.getElementById('start').style.display='none';document.getElementById('game').style.display='block';G.inv={junglerat:1,chemical:1};initMap();updateUI();updateJobs();showTut()}
+function showTut(){document.getElementById('tut-bg').classList.add('active');updTut()}
+function updTut(){const s=tuts[G.tutStep];document.getElementById('tut-title').textContent=s.t;document.getElementById('tut-text').innerHTML=s.m;document.getElementById('tut-dots').innerHTML=tuts.map((_,i)=>`<div class="tut-dot ${i<G.tutStep?'done':''} ${i===G.tutStep?'active':''}"></div>`).join('')}
+function nextTut(){G.tutStep++;if(G.tutStep>=tuts.length)skipTut();else updTut()}
+function skipTut(){document.getElementById('tut-bg').classList.remove('active');log('Welcome! Use Side Jobs to earn money, then craft pathogens.','info')}
+
+function initMap(){const m=document.getElementById('map');m.innerHTML='<svg viewBox="0 0 800 400" style="width:100%;height:100%"><rect width="800" height="400" fill="#0d1117"/><g stroke="#1a2332" stroke-width=".5"><line x1="0" y1="100" x2="800" y2="100"/><line x1="0" y1="200" x2="800" y2="200"/><line x1="0" y1="300" x2="800" y2="300"/><line x1="200" y1="0" x2="200" y2="400"/><line x1="400" y1="0" x2="400" y2="400"/><line x1="600" y1="0" x2="600" y2="400"/></g><g fill="#1a2332" stroke="#2d3748"><path d="M50 80 L180 60 L200 120 L170 180 L100 200 L60 150 Z"/><path d="M120 220 L180 200 L200 280 L160 350 L100 320 Z"/><path d="M350 70 L420 60 L440 120 L400 140 L350 120 Z"/><path d="M350 160 L420 150 L450 250 L400 320 L340 280 L330 200 Z"/><path d="M450 50 L650 40 L700 100 L680 180 L550 200 L480 160 L460 100 Z"/><path d="M620 280 L700 260 L720 320 L680 350 L620 330 Z"/></g></svg>';
+Object.entries(locs).forEach(([id,l])=>{const d=document.createElement('div');d.className='marker'+(id===G.loc?' current':'');d.id='m-'+id;d.style.cssText=`left:${l.x/8}%;top:${l.y/4}%`;d.innerHTML=`<svg width="24" height="32" viewBox="0 0 30 40"><use href="#i-marker" fill="${id===G.loc?'#39ff14':'#f44'}"/></svg>`;d.onclick=()=>travel(id);m.appendChild(d)})}
+
+function travel(id){if(id===G.loc)return;const c=locs[id].c;if(G.money<c){log(`Need $${fmt(c)} to travel!`,'danger');return}G.money-=c;G.loc=id;document.querySelectorAll('.marker').forEach(m=>{m.classList.remove('current');m.querySelector('use').setAttribute('fill','#f44')});const mk=document.getElementById('m-'+id);mk.classList.add('current');mk.querySelector('use').setAttribute('fill','#39ff14');document.getElementById('loc-name').textContent=locs[id].n;log(`Traveled to ${locs[id].n} (-$${fmt(c)})`,'info');updateUI()}
+
+function openShop(){const l=locs[G.loc];document.getElementById('shop-loc').textContent=l.n;document.getElementById('shop-spec').textContent=l.d;const g=document.getElementById('shop-grid');g.innerHTML='';l.items.forEach(id=>{const it=items[id];if(!it)return;const pr=Math.round(it.p*l.m);const own=G.inv[id]||0;g.innerHTML+=`<div class="shop-item" onclick="buy('${id}')">${svg(it.i)}<div style="font-weight:600;font-size:.85em">${it.n}</div><div style="font-size:.7em;color:var(--muted)">Own: ${own}</div><div class="price">$${fmt(pr)}</div></div>`});document.getElementById('shop-modal').classList.add('active')}
+function closeShop(){document.getElementById('shop-modal').classList.remove('active')}
+function buy(id){const l=locs[G.loc],it=items[id],pr=Math.round(it.p*l.m);if(G.money<pr){log(`Can't afford ${it.n}!`,'danger');return}G.money-=pr;G.inv[id]=(G.inv[id]||0)+1;log(`Bought ${it.n} for $${fmt(pr)}`,'success');updateUI();openShop()}
+
+function doJob(id){const j=jobs[id];if(G.cooldowns[id]>0){log(`${j.n} on cooldown`,'warning');return}const pay=Math.round(j.pay[0]+Math.random()*(j.pay[1]-j.pay[0]));G.money+=pay;G.suspicion+=j.sus;if(j.cd>0)G.cooldowns[id]=j.cd;log(`${j.n}: +$${fmt(pay)}`,'success');updateUI();updateJobs()}
+function updateJobs(){const c=document.getElementById('jobs-list');c.innerHTML='';Object.entries(jobs).forEach(([id,j])=>{const cd=G.cooldowns[id]||0;c.innerHTML+=`<div class="job ${cd>0?'cooldown':''}"><div class="job-info"><h4>${j.n}</h4><p>${j.d}</p><p style="color:var(--green)">$${fmt(j.pay[0])}-$${fmt(j.pay[1])}</p>${cd>0?`<p style="color:var(--yellow)">⏳ ${cd}d</p>`:''}</div><button class="btn btn-sm btn-money" onclick="doJob('${id}')" ${cd>0?'disabled':''}>Do It</button></div>`});
+const pr=document.getElementById('pr-list');pr.innerHTML=[['media','📺 Media Campaign','-15% | $50M',50000000,15],['factcheck','🔍 Fact-Checkers','-10% | $30M',30000000,10],['lobby','🏛️ Politicians','-20% | $100M',100000000,20],['academic','🎓 Academic Grants','-8% | $20M',20000000,8],['bots','🤖 Bot Farm','-5% | $10M',10000000,5]].map(([id,n,d,c,r])=>`<div class="pr-item"><div class="pr-info"><h4>${n}</h4><p>${d}</p></div><button class="btn btn-sm btn-info" onclick="buyPR(${c},${r})">Buy</button></div>`).join('')}
+function buyPR(c,r){if(G.money<c){log("Can't afford PR!",'danger');return}G.money-=c;G.suspicion=Math.max(0,G.suspicion-r);log(`PR deployed: -${r}% suspicion`,'success');updateUI()}
+
+function selectItem(id){const slot=G.slots.findIndex(s=>s===null);if(slot===-1){log('Slots full! Click to clear.','warning');return}const used=G.slots.filter(s=>s===id).length;if(used>=(G.inv[id]||0)){log('No more available!','warning');return}G.slots[slot]=id;updateSlots()}
+function clearSlot(i){G.slots[i]=null;updateSlots()}
+function updateSlots(){for(let i=0;i<3;i++){const s=document.getElementById('slot'+i),id=G.slots[i];if(id){const it=items[id];s.innerHTML=svg(it.i);s.classList.add('filled')}else{s.innerHTML='';s.classList.remove('filled')}}const r=document.getElementById('result');if(!G.slots.includes(null)){const pre=genCreation(G.slots);r.innerHTML=svg(pre.type==='pathogen'?'virus':pre.type==='vaccine'?'vaccine':'hybrid')}else r.innerHTML='?'}
+
+function genCreation(ing){const types=ing.map(id=>items[id].t);const ac=types.filter(t=>t==='animal').length,cc=types.filter(t=>t==='chemical').length,ec=types.filter(t=>t==='equip').length;let type;if(ac>=2)type='pathogen';else if(cc>=2&&ec>=1)type='vaccine';else if(ac>=1&&cc>=1&&ec>=1)type='hybrid';else type=Math.random()>.3?'pathogen':'hybrid';
+let sp=0,le=0,st=0,pr=0;ing.forEach(id=>{const i=items[id].i;if(i==='bat'){sp+=3;le+=1}if(i==='pangolin'){sp+=2;le+=2}if(i==='monkey'){sp+=2;le+=3}if(i==='mosquito'){sp+=4;le+=1}if(i==='frog'){le+=4;st-=1}if(i==='civet'){sp+=2;st+=1}if(i==='camel'){sp+=1;le+=2;st+=2}if(i==='mink'){sp+=3;st+=1}if(i==='snake'){le+=3;sp+=1}if(i==='rat'){sp+=2;st+=2}if(i==='chemical'){sp+=1;st+=1}if(i==='spike'){sp+=3;pr+=2}if(i==='mrna'){pr+=3;st+=2}if(i==='prion'){le+=5;st-=2;sp-=1}if(i==='toxin'){le+=4;sp-=1}if(i==='enzyme'){sp+=2;pr+=1}if(i==='lipid'){st+=3;pr+=2}if(i==='adjuvant'){pr+=3;st+=1}if(i==='gof'){sp+=3;le+=2;pr+=1}if(i==='bioreactor'){st+=3;pr+=1}if(i==='centrifuge'){st+=2;pr+=1}if(i==='sequencer'){pr+=2;st+=1}if(i==='incubator')st+=3;if(i==='crispr'){sp+=2;le+=2;pr+=2}});
+sp=Math.max(1,Math.min(10,Math.round(sp*1.2)));le=Math.max(1,Math.min(10,Math.round(le*1.2)));st=Math.max(1,Math.min(10,5+Math.round(st)));pr=Math.max(1,Math.min(10,3+Math.round(pr)));
+if(type==='vaccine'){[sp,st]=[st,sp];pr+=2}
+const pf=['Neo-','SARS-','H5N','Omega-','Delta-'],sf=['-CoV','-X','-19',' Variant'],mid=ing.map(id=>items[id].n.substring(0,3).toUpperCase());const nm=pf[Math.floor(Math.random()*pf.length)]+mid[Math.floor(Math.random()*mid.length)]+sf[Math.floor(Math.random()*sf.length)];
+return{id:Date.now(),name:nm,type,spread:sp,lethality:le,stability:st,profit:Math.min(10,pr),health:100,days:0,released:false}}
+
+function craft(){if(G.slots.includes(null)){log('Fill all 3 slots!','warning');return}G.slots.forEach(id=>{G.inv[id]--;if(G.inv[id]<=0)delete G.inv[id]});const c=genCreation(G.slots);G.creations.push(c);G.slots=[null,null,null];G.suspicion+=1;log(`Created ${c.type==='pathogen'?'☣️':c.type==='vaccine'?'💉':'🧬'} "${c.name}"!`,'success');updateUI()}
+
+function release(){const p=G.creations.find(c=>(c.type==='pathogen'||c.type==='hybrid')&&!c.released&&c.health>0);if(!p){log('No viable pathogen!','warning');return}p.released=true;G.pathogens.push(p);G.infection=Math.min(100,G.infection+p.spread*.5);document.getElementById('m-'+G.loc).classList.add('infected');log(`☣️ RELEASED "${p.name}"!`,'danger');if(p.stability<4)log('⚠️ Low stability - may die quickly!','warning');if(p.spread>=8)log('🔥 High spread - will transmit fast!','warning');G.suspicion+=3+p.lethality;updateUI()}
+
+function sellVax(){if(!G.pathogens.some(p=>p.health>0)||G.infection<5){log('No pandemic = no demand!','warning');return}const vax=G.creations.filter(c=>c.type==='vaccine'||c.type==='hybrid');let mult=vax.length>0?1+vax.reduce((a,b)=>a.profit>b.profit?a:b).profit/5:1;let profit=0;G.pathogens.forEach(p=>{if(p.health>0){profit+=Math.round(500000000*p.profit*mult*(1+G.infection/30)*(.7+Math.random()*.6))}});G.money+=profit;G.vaxSold++;G.suspicion+=2+Math.floor(G.vaxSold/4);log(`💰 Vaccine sales: +$${fmt(profit)}`,'success');updateUI();checkEnd()}
+
+function nextDay(){G.day++;Object.keys(G.cooldowns).forEach(k=>{if(G.cooldowns[k]>0)G.cooldowns[k]--});
+G.pathogens.forEach(p=>{if(p.health<=0)return;p.days++;const rate=p.spread*(.3+Math.random()*.7);G.infection=Math.min(100,G.infection+(p.spread>=7?rate*1.5:rate*.8));const deg=(10-p.stability)*2+Math.random()*5;p.health=Math.max(0,p.health-deg);if(p.spread>=8&&G.infection>30)p.health=Math.min(100,p.health+5);if(p.stability<=3&&p.days>10)p.health-=10;if(p.health<=0){log(`💀 "${p.name}" died off!`,'warning');G.infection=Math.max(0,G.infection-5)}});
+if(G.pathogens.some(p=>p.health>0)){G.suspicion+=.5+Math.floor(G.infection/25);if(Math.random()<.15)pandemicEvent();Object.keys(locs).forEach(id=>{if(Math.random()<G.infection/150)document.getElementById('m-'+id)?.classList.add('infected')})}else if(G.infection>0)G.infection=Math.max(0,G.infection-2);
+updateUI();updateJobs();checkEnd()}
+
+function pandemicEvent(){const ev=[[()=>{G.money+=3e9},'Vaccine mandate! +$3B'],[()=>{G.infection+=8;if(G.pathogens[0])G.pathogens[0].health=Math.min(100,G.pathogens[0].health+20)},'Variant discovered!'],[()=>G.suspicion+=8,'Documentary questions origins...'],[()=>G.money+=15e9,'Government contract! +$15B'],[()=>G.suspicion+=12,'Lab records leaked!'],[()=>{G.money+=8e9;G.suspicion-=5},'WHO endorses vaccine! +$8B']];const[fn,msg]=ev[Math.floor(Math.random()*ev.length)];fn();log(`📰 ${msg}`,'danger')}
+
+function checkEnd(){if(G.suspicion>=100)endGame(false,'Exposed! Arrested for crimes against humanity.');else if(G.money>=200e9)endGame(true,'You reached $200B while avoiding accountability!')}
+function endGame(win,msg){const m=document.getElementById('end-modal'),c=document.getElementById('end-content');c.className='modal';document.getElementById('end-title').textContent=win?'🎉 VICTORY!':'💀 GAME OVER';document.getElementById('end-title').style.color=win?'var(--green)':'var(--red)';document.getElementById('end-msg').textContent=msg;document.getElementById('end-stats').innerHTML=`<p>Net Worth: <span style="color:var(--green)">$${fmt(G.money)}</span></p><p>Days: ${G.day}</p><p>Creations: ${G.creations.length}</p><p>Vaccines Sold: ${G.vaxSold}</p><p>Suspicion: ${Math.round(G.suspicion)}%</p>`;m.classList.add('active')}
+
+function switchTab(t,el){const p=el.closest('.panel');p.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.tab-content').forEach(x=>x.classList.remove('active'));el.classList.add('active');document.getElementById(t+'-tab').classList.add('active')}
+
+function updateUI(){document.getElementById('money').textContent='$'+fmt(G.money);document.getElementById('suspicion').textContent=Math.round(G.suspicion)+'%';document.getElementById('infection').textContent=Math.round(G.infection)+'%';document.getElementById('day').textContent=G.day;document.getElementById('susp-bar').style.width=Math.min(100,G.suspicion)+'%';document.getElementById('inf-bar').style.width=Math.min(100,G.infection)+'%';
+const inv=document.getElementById('inv-list');inv.innerHTML=Object.entries(G.inv).filter(([_,q])=>q>0).map(([id,q])=>{const it=items[id];return`<div class="inv-item" onclick="selectItem('${id}')">${svg(it.i)}<div class="item-info"><div class="item-name">${it.n}</div><div class="item-qty">Qty: ${q} | ${it.t}</div></div></div>`}).join('')||'<p style="color:var(--muted);text-align:center;padding:20px">Empty. Visit Black Market!</p>';
+const cre=document.getElementById('cre-list');cre.innerHTML=G.creations.map(c=>{const ic=c.type==='pathogen'?'virus':c.type==='vaccine'?'vaccine':'hybrid';const dead=c.health<=0;const hc=c.health<=30?'dying':c.health<=60?'weak':'good';return`<div class="disease ${c.type} ${dead?'dead':''}"><div style="display:flex;align-items:center;gap:10px">${svg(ic)}<div class="disease-name">${c.type==='pathogen'?'☣️':c.type==='vaccine'?'💉':'🧬'} ${c.name}</div></div><div class="disease-stats"><div class="disease-stat"><div class="disease-stat-label">Spread</div><div class="disease-stat-value">${c.spread}</div></div><div class="disease-stat"><div class="disease-stat-label">Lethal</div><div class="disease-stat-value">${c.lethality}</div></div><div class="disease-stat"><div class="disease-stat-label">Stable</div><div class="disease-stat-value">${c.stability}</div></div><div class="disease-stat"><div class="disease-stat-label">Profit</div><div class="disease-stat-value">${c.profit}</div></div></div>${c.released?`<div class="health-bar"><span style="font-size:.7em">HP:</span><div class="health-track"><div class="health-fill ${hc}" style="width:${c.health}%"></div></div><span style="font-size:.7em">${Math.round(c.health)}%</span></div>`:''}</div>`}).join('')||'<p style="color:var(--muted);text-align:center;padding:20px">No creations yet.</p>';
+updateSlots();document.getElementById('rel-btn').disabled=!G.creations.some(c=>(c.type==='pathogen'||c.type==='hybrid')&&!c.released&&c.health>0);document.getElementById('vax-btn').disabled=!G.pathogens.some(p=>p.health>0)||G.infection<5}
+
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeShop();if(e.key===' '&&!document.getElementById('shop-modal').classList.contains('active')){e.preventDefault();nextDay()}});
+</script>
+</body>
+</html>
